@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handwriting to Text</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom right, rgba(238, 174, 202, 0.6), rgba(148, 187, 233, 0.6));
+            font-family: 'Arial', sans-serif;
+            color: #333;
+        }
+    
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.7);
+        }
+    
+        #canvas {
+            border: 2px solid rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            cursor: crosshair;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+    
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: rgba(148, 187, 233, 0.8);
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+    
+        button:hover {
+            background-color: rgba(148, 187, 233, 1);
+            transform: scale(1.05);
+        }
+    
+        #textResult {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+    
+</head>
+<body>
+    <h1>Stylus</h1>
+    <canvas id="canvas" width="1500" height="600"></canvas>
+    <button id="clearBtn">Clear</button>
+    <div id="textResult">Recognized Text: <span id="recognizedText"></span></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let timeout = null;
+
+// Set initial canvas background
+ctx.fillStyle = '#fff';
+ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill the canvas with the background color
+
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mousemove', draw);
+
+function startDrawing(event) {
+    isDrawing = true;
+    ctx.beginPath();
+    ctx.moveTo(event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop);
+}
+
+function stopDrawing() {
+    isDrawing = false;
+    ctx.closePath();
+    
+    // Clear any previous timeout
+    if (timeout) clearTimeout(timeout);
+    
+    timeout = setTimeout(captureAndProcessImage, 2000);
+}
+
+function draw(event) {
+    if (!isDrawing) return;
+
+    // Log mouse coordinates for debugging
+    console.log('Drawing at: ', event.clientX, event.clientY);
+
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000'; // Set the drawing color (black)
+    ctx.lineTo(event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop);
+    ctx.stroke();
+}
+
+// Clear the canvas
+document.getElementById('clearBtn').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill the canvas with the background color
+    document.getElementById('recognizedText').textContent = ""; // Clear recognized text as well
+});
+
+async function captureAndProcessImage() {
+    canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('image', blob, 'handwritten.png');  // Append the blob to formData with a filename
+
+        try {
+            const response = await fetch('https://44b8-34-90-202-123.ngrok-free.app/ocr', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log("OCR Result:", result);  // Log the OCR result for debugging
+
+            if (result.text && result.text.trim() !== "") {
+                document.getElementById('recognizedText').textContent = result.text;
+            } else {
+                document.getElementById('recognizedText').textContent = "No text recognized.";
+            }
+
+        } catch (error) {
+            console.error("Error during OCR processing:", error);
+            document.getElementById('recognizedText').textContent = "Failed to recognize text.";
+        }
+    }, 'image/png');
+}
+
+    </script>    
+</body>
+</html>
